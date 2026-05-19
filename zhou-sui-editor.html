@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>周岁纪念相册编辑器 v8</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #1a1a2e;
+            min-height: 100vh;
+            color: #eee;
+            overflow-x: hidden;
+        }
+        .header {
+            background: #16213e;
+            padding: 12px 15px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid #0f3460;
+            flex-shrink: 0;
+        }
+        .header h1 { font-size: 16px; color: #e94560; }
+        .header-actions { display: flex; gap: 8px; }
+        .btn {
+            padding: 8px 14px;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-primary { background: #e94560; color: white; }
+        .btn-primary:hover { background: #d63a54; }
+        .btn-secondary { background: #0f3460; color: white; }
+        .btn-secondary:hover { background: #1a4a80; }
+        .main-container {
+            display: flex;
+            flex-direction: column;
+            height: calc(100vh - 50px);
+        }
+        .sidebar {
+            width: 100%;
+            background: #16213e;
+            padding: 10px;
+            border-bottom: 1px solid #0f3460;
+            overflow-y: visible;
+            flex-shrink: 0;
+        }
+        .sidebar h3 { font-size: 13px; color: #888; margin-bottom: 8px; }
+        .upload-zone {
+            padding: 12px;
+            background: #0f3460;
+            border-radius: 10px;
+            text-align: center;
+            border: 2px dashed #16213e;
+            cursor: pointer;
+            margin-bottom: 8px;
+        }
+        .upload-zone:hover { border-color: #e94560; }
+        .upload-zone h4 { color: #e94560; margin-bottom: 4px; font-size: 13px; }
+        .upload-zone p { color: #888; font-size: 11px; line-height: 1.3; }
+        #photoInput { display: none; }
+        .uploaded-photos {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 5px;
+            margin-top: 8px;
+        }
+        .uploaded-photo {
+            aspect-ratio: 1;
+            border-radius: 6px;
+            overflow: hidden;
+            cursor: pointer;
+            border: 2px solid transparent;
+        }
+        .uploaded-photo:hover { border-color: #e94560; }
+        .uploaded-photo img { width: 100%; height: 100%; object-fit: cover; }
+        .editor-area {
+            flex: 1;
+            padding: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: auto;
+        }
+        .canvas-container {
+            position: relative;
+            width: 800px;
+            height: 460px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            transform-origin: top left;
+        }
+        .template-canvas {
+            position: relative;
+            width: 800px;
+            height: 460px;
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+        }
+        .photo-slot {
+            position: absolute;
+            background: rgba(255,255,255,0.08);
+            border: 2px dashed rgba(233,69,96,0.5);
+            border-radius: 6px;
+            cursor: pointer;
+            overflow: hidden;
+            transition: all 0.3s;
+        }
+        .photo-slot:hover { border-color: #e94560; }
+        .photo-slot.selected { border-color: #e94560; box-shadow: 0 0 15px rgba(233,69,96,0.5); }
+        .photo-slot.filled { border-style: solid; border-color: rgba(255,255,255,0.4); }
+        .photo-slot img {
+            position: absolute;
+            object-fit: cover;
+            pointer-events: none;
+        }
+        .placeholder {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 24px;
+            color: rgba(233,69,96,0.7);
+        }
+        .properties-panel {
+            width: 100%;
+            background: #16213e;
+            padding: 10px;
+            border-top: 1px solid #0f3460;
+            overflow-y: auto;
+            max-height: 180px;
+            flex-shrink: 0;
+        }
+        .properties-panel h3 { font-size: 13px; color: #888; margin-bottom: 10px; }
+        .property-group { margin-bottom: 12px; }
+        .property-group label { display: block; margin-bottom: 5px; color: #aaa; font-size: 12px; }
+        .property-group input[type="range"] {
+            width: 100%;
+            height: 5px;
+            border-radius: 3px;
+            background: #0f3460;
+            outline: none;
+            -webkit-appearance: none;
+        }
+        .property-group input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #e94560;
+            cursor: pointer;
+        }
+        .property-value { margin-top: 3px; color: #e94560; font-size: 11px; }
+        .btn-full { width: 100%; margin-top: 8px; }
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #e94560;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 1000;
+            font-size: 13px;
+        }
+        .toast.show { opacity: 1; }
+        .no-selection { color: #666; text-align: center; padding: 15px; font-size: 12px; }
+
+        @media (max-width: 899px) {
+            .canvas-container {
+                width: calc(100vw - 20px);
+                height: auto;
+                aspect-ratio: 800 / 460;
+            }
+            .template-canvas {
+                width: 100%;
+                height: 100%;
+            }
+            .uploaded-photos { grid-template-columns: repeat(6, 1fr); gap: 4px; }
+            .sidebar { max-height: none; overflow-y: visible; }
+        }
+
+        @media (min-width: 900px) {
+            .main-container { flex-direction: row; height: calc(100vh - 56px); }
+            .sidebar { width: 240px; max-height: none; border-right: 1px solid #0f3460; border-bottom: none; padding: 15px; }
+            .sidebar h3 { font-size: 14px; margin-bottom: 12px; }
+            .upload-zone { padding: 25px; margin-bottom: 15px; }
+            .uploaded-photos { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+            .editor-area { padding: 20px; }
+            .properties-panel { width: 240px; max-height: none; border-left: 1px solid #0f3460; border-top: none; padding: 15px; }
+            .header { padding: 15px 20px; }
+            .header h1 { font-size: 20px; }
+            .btn { padding: 10px 18px; font-size: 14px; }
+            .placeholder { font-size: 32px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎂 周岁纪念相册编辑器</h1>
+        <div class="header-actions">
+            <button class="btn btn-secondary" onclick="clearAll()">清空全部</button>
+            <button class="btn btn-primary" onclick="exportImage()">导出图片</button>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <div class="sidebar">
+            <h3>上传照片</h3>
+            <div class="upload-zone" onclick="document.getElementById('photoInput').click()">
+                <h4>📁 点击上传</h4>
+                <p>支持 JPG、PNG 格式<br>可同时上传多张</p>
+                <input type="file" id="photoInput" accept="image/*" multiple onchange="handlePhotoUpload(event)">
+            </div>
+            <h3>已上传照片</h3>
+            <div class="uploaded-photos" id="uploadedPhotos"></div>
+            <p style="color:#555;font-size:11px;margin-top:6px;">点击照片添加到模板</p>
+        </div>
+
+        <div class="editor-area">
+            <div class="canvas-container">
+                <div class="template-canvas" id="templateCanvas"></div>
+            </div>
+        </div>
+
+        <div class="properties-panel">
+            <h3>调整照片</h3>
+            <div id="propertiesContent">
+                <div class="no-selection">请先选择一个照片框</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // 坐标基于 800x460 画布
+        const slotPositions = [
+            { left: 54, top: 93, width: 101, height: 129 },
+            { left: 172, top: 93, width: 101, height: 129 },
+            { left: 290, top: 93, width: 101, height: 129 },
+            { left: 408, top: 93, width: 101, height: 129 },
+            { left: 526, top: 93, width: 101, height: 129 },
+            { left: 644, top: 93, width: 101, height: 129 },
+            { left: 54, top: 255, width: 101, height: 129 },
+            { left: 172, top: 255, width: 101, height: 129 },
+            { left: 290, top: 255, width: 101, height: 129 },
+            { left: 408, top: 255, width: 101, height: 129 },
+            { left: 526, top: 255, width: 101, height: 129 },
+            { left: 644, top: 255, width: 101, height: 129 }
+        ];
+
+        let uploadedPhotos = [];
+        let selectedSlotIndex = null;
+        let slotPhotos = new Array(12).fill(null);
+
+        document.addEventListener('DOMContentLoaded', () => {
+            fixMobileScale();
+            renderTemplate();
+            window.addEventListener('resize', debounce(() => { fixMobileScale(); renderTemplate(); }, 200));
+        });
+
+        function debounce(fn, delay) {
+            let t = null;
+            return function() {
+                clearTimeout(t); t = setTimeout(() => fn.apply(this, arguments), delay);
+            };
+        }
+
+        // 手机端：确保布局正确
+        function fixMobileScale() {
+            const container = document.querySelector('.canvas-container');
+            if (!container) return;
+            // 重置为 CSS 控制的自适应尺寸
+            if (window.innerWidth > 899) {
+                container.style.width = '800px';
+                container.style.height = '460px';
+            } else {
+                container.style.width = '';
+                container.style.height = '';
+            }
+        }
+
+        function getSlotPositions() {
+            const canvas = document.getElementById('templateCanvas');
+            const w = canvas.offsetWidth || 800;
+            const scale = w / 800;
+            return slotPositions.map(pos => ({
+                left: pos.left * scale,
+                top: pos.top * scale,
+                width: pos.width * scale,
+                height: pos.height * scale
+            }));
+        }
+
+        function renderTemplate() {
+            const canvas = document.getElementById('templateCanvas');
+            canvas.style.backgroundImage = 'url(zhou-sui-template.jpg?v=4)';
+            canvas.innerHTML = '';
+
+            const positions = getSlotPositions();
+
+            positions.forEach((pos, index) => {
+                const slot = document.createElement('div');
+                slot.className = 'photo-slot';
+                slot.style.left = pos.left + 'px';
+                slot.style.top = pos.top + 'px';
+                slot.style.width = pos.width + 'px';
+                slot.style.height = pos.height + 'px';
+                slot.dataset.index = index;
+                slot.onclick = function(e) { selectSlot(index, e); };
+
+                if (slotPhotos[index]) {
+                    slot.classList.add('filled');
+                    var img = document.createElement('img');
+                    img.src = slotPhotos[index].src;
+                    var photoScale = slotPhotos[index].scale / 100;
+                    img.style.width = (100 * photoScale) + '%';
+                    img.style.height = (100 * photoScale) + '%';
+                    img.style.left = slotPhotos[index].x + 'px';
+                    img.style.top = slotPhotos[index].y + 'px';
+                    img.style.transform = 'rotate(' + slotPhotos[index].rotate + 'deg)';
+                    slot.appendChild(img);
+                } else {
+                    var ph = document.createElement('div');
+                    ph.className = 'placeholder';
+                    ph.textContent = '+';
+                    slot.appendChild(ph);
+                }
+
+                canvas.appendChild(slot);
+            });
+        }
+
+        function selectSlot(index, event) {
+            if (event) event.stopPropagation();
+            document.querySelectorAll('.photo-slot').forEach(function(s) { s.classList.remove('selected'); });
+            selectedSlotIndex = index;
+            document.querySelectorAll('.photo-slot')[index].classList.add('selected');
+            updatePropertiesPanel();
+        }
+
+        function updatePropertiesPanel() {
+            var content = document.getElementById('propertiesContent');
+            if (selectedSlotIndex === null || !slotPhotos[selectedSlotIndex]) {
+                content.innerHTML = '<div class="no-selection">请先选择一个照片框</div>';
+                return;
+            }
+            var photo = slotPhotos[selectedSlotIndex];
+            content.innerHTML =
+                '<div class="property-group"><label>缩放</label><input type="range" id="scaleSlider" min="50" max="200" value="' + photo.scale + '" oninput="updatePhoto(\'scale\', this.value)"><div class="property-value"><span id="scaleValue">' + photo.scale + '</span>%</div></div>' +
+                '<div class="property-group"><label>水平位置</label><input type="range" id="xSlider" min="-200" max="200" value="' + photo.x + '" oninput="updatePhoto(\'x\', this.value)"><div class="property-value"><span id="xValue">' + photo.x + '</span>px</div></div>' +
+                '<div class="property-group"><label>垂直位置</label><input type="range" id="ySlider" min="-200" max="200" value="' + photo.y + '" oninput="updatePhoto(\'y\', this.value)"><div class="property-value"><span id="yValue">' + photo.y + '</span>px</div></div>' +
+                '<div class="property-group"><label>旋转</label><input type="range" id="rotateSlider" min="-180" max="180" value="' + photo.rotate + '" oninput="updatePhoto(\'rotate\', this.value)"><div class="property-value"><span id="rotateValue">' + photo.rotate + '</span>&#176;</div></div>' +
+                '<button class="btn btn-secondary btn-full" onclick="removePhoto()">移除照片</button>';
+        }
+
+        function updatePhoto(prop, value) {
+            if (selectedSlotIndex === null || !slotPhotos[selectedSlotIndex]) return;
+            slotPhotos[selectedSlotIndex][prop] = parseFloat(value);
+            var el = document.getElementById(prop + 'Value');
+            if (el) el.textContent = value;
+
+            var slot = document.querySelectorAll('.photo-slot')[selectedSlotIndex];
+            var img = slot.querySelector('img');
+            if (!img) return;
+            if (prop === 'scale') { img.style.width = value + '%'; img.style.height = value + '%'; }
+            else if (prop === 'x') img.style.left = value + 'px';
+            else if (prop === 'y') img.style.top = value + 'px';
+            else if (prop === 'rotate') img.style.transform = 'rotate(' + value + 'deg)';
+        }
+
+        function removePhoto() {
+            if (selectedSlotIndex === null) return;
+            slotPhotos[selectedSlotIndex] = null;
+            renderTemplate();
+            updatePropertiesPanel();
+            showToast('照片已移除');
+        }
+
+        function handlePhotoUpload(event) {
+            var files = event.target.files;
+            if (!files.length) return;
+            Array.from(files).forEach(function(file) {
+                var reader = new FileReader();
+                reader.onload = function(e) {
+                    uploadedPhotos.push({ src: e.target.result, name: file.name });
+                    renderUploadedPhotos();
+                };
+                reader.readAsDataURL(file);
+            });
+            event.target.value = '';
+        }
+
+        function renderUploadedPhotos() {
+            var container = document.getElementById('uploadedPhotos');
+            container.innerHTML = '';
+            uploadedPhotos.forEach(function(photo, index) {
+                var div = document.createElement('div');
+                div.className = 'uploaded-photo';
+                div.innerHTML = '<img src="' + photo.src + '" alt="' + photo.name + '">';
+                div.onclick = function() { addPhotoToSlot(index); };
+                container.appendChild(div);
+            });
+        }
+
+        function addPhotoToSlot(photoIndex) {
+            if (selectedSlotIndex === null) {
+                var emptyIdx = slotPhotos.findIndex(function(p) { return p === null; });
+                if (emptyIdx === -1) { showToast('所有位置已填满'); return; }
+                selectedSlotIndex = emptyIdx;
+            }
+            var photo = uploadedPhotos[photoIndex];
+            slotPhotos[selectedSlotIndex] = { src: photo.src, scale: 100, x: 0, y: 0, rotate: 0 };
+            renderTemplate();
+            selectSlot(selectedSlotIndex);
+            showToast('照片已添加到第' + (selectedSlotIndex + 1) + '格');
+        }
+
+        function clearAll() {
+            uploadedPhotos = [];
+            slotPhotos = new Array(12).fill(null);
+            selectedSlotIndex = null;
+            renderUploadedPhotos();
+            renderTemplate();
+            updatePropertiesPanel();
+            showToast('已清空');
+        }
+
+        function exportImage() {
+            var filledCount = slotPhotos.filter(function(p) { return p !== null; }).length;
+            if (filledCount === 0) { showToast('请先添加照片'); return; }
+            showToast('正在生成高清图片...');
+
+            var canvas = document.createElement('canvas');
+            var ctx = canvas.getContext('2d');
+            var originalW = 3484;
+            var originalH = 2004;
+            var scaleFactor = originalW / 800;
+            canvas.width = originalW;
+            canvas.height = originalH;
+
+            var bgImg = new Image();
+            bgImg.onload = function() { ctx.drawImage(bgImg, 0, 0, originalW, originalH); drawPhotos(); };
+            bgImg.onerror = function() { ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, originalW, originalH); drawPhotos(); };
+            bgImg.src = 'zhou-sui-template.jpg?v=4';
+
+            function drawPhotos() {
+                var loadedCount = 0;
+                var totalPhotos = slotPhotos.filter(function(p) { return p !== null; }).length;
+                if (totalPhotos === 0) { downloadCanvas(canvas); showToast('图片已导出'); return; }
+
+                slotPhotos.forEach(function(photo, index) {
+                    if (!photo) { loadedCount++; checkDone(); return; }
+                    var pos = slotPositions[index];
+                    var origLeft = pos.left * scaleFactor;
+                    var origTop = pos.top * scaleFactor;
+                    var origWidth = pos.width * scaleFactor;
+                    var origHeight = pos.height * scaleFactor;
+
+                    var img = new Image();
+                    img.onload = function() {
+                        ctx.save();
+                        ctx.beginPath();
+                        ctx.roundRect(origLeft, origTop, origWidth, origHeight, 8 * scaleFactor);
+                        ctx.clip();
+                        var photoScale = photo.scale / 100;
+                        var baseScale = Math.max(origWidth / img.width, origHeight / img.height);
+                        var imgWidth = img.width * baseScale * photoScale;
+                        var imgHeight = img.height * baseScale * photoScale;
+                        var drawX = origLeft + (origWidth - imgWidth) / 2 + photo.x * scaleFactor;
+                        var drawY = origTop + (origHeight - imgHeight) / 2 + photo.y * scaleFactor;
+                        ctx.translate(drawX + imgWidth/2, drawY + imgHeight/2);
+                        ctx.rotate(photo.rotate * Math.PI / 180);
+                        ctx.drawImage(img, -imgWidth/2, -imgHeight/2, imgWidth, imgHeight);
+                        ctx.restore();
+                        loadedCount++;
+                        checkDone();
+                    };
+                    img.onerror = function() { loadedCount++; checkDone(); };
+                    img.src = photo.src;
+                });
+
+                function checkDone() {
+                    if (loadedCount >= totalPhotos) { downloadCanvas(canvas); showToast('高清图片已导出'); }
+                }
+            }
+        }
+
+        function downloadCanvas(canvas) {
+            var link = document.createElement('a');
+            link.download = 'zhou_sui_' + Date.now() + '.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        }
+
+        function showToast(message) {
+            var toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(function() { toast.classList.remove('show'); }, 2000);
+        }
+    </script>
+</body>
+</html>
